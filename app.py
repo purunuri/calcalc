@@ -3,47 +3,82 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 
 # --- 앱 설정 ---
-st.set_page_config(page_title="공무원 경력 계산기", page_icon="📜")
+st.set_page_config(page_title="공무원 경력 합산기", page_icon="🗂️", layout="wide")
 
-st.title("📜 역(曆)에 의한 경력 계산기")
-st.markdown("---")
-st.write("공무원 인사처 기준에 맞춘 역에 의한 경력 산출 도구입니다.")
+st.title("🗂️ 공무원 경력 합산 계산기 (v2.0)")
+st.markdown("여러 개의 경력을 입력하면 역에 의해 합산하여 최종 결과를 보여줍니다.")
 
-# --- 입력 부 ---
-col1, col2 = st.columns(2)
-with col1:
-    start_date = st.date_input("임용일 (시작일)", date.today())
-with col2:
-    end_date = st.date_input("퇴직일 (종료일)", date.today())
+# --- 세션 상태 초기화 (경력 리스트 저장용) ---
+if 'career_list' not in st.session_state:
+    st.session_state.career_list = [{'content': '', 'start': date.today(), 'end': date.today()}]
+
+# --- 기능 함수: 경력 추가/삭제 ---
+def add_career():
+    st.session_state.career_list.append({'content': '', 'start': date.today(), 'end': date.today()})
+
+def remove_career(index):
+    if len(st.session_state.career_list) > 1:
+        st.session_state.career_list.pop(index)
+
+# --- 입력 UI ---
+st.subheader("1. 경력 사항 입력")
+for i, career in enumerate(st.session_state.career_list):
+    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+    
+    with col1:
+        career['content'] = st.text_input(f"내용 (선택)", value=career['content'], key=f"content_{i}", placeholder="예: OO초등학교 근무")
+    with col2:
+        career['start'] = st.date_input(f"시작일", value=career['start'], key=f"start_{i}")
+    with col3:
+        career['end'] = st.date_input(f"종료일", value=career['end'], key=f"end_{i}")
+    with col4:
+        st.write(" ") # 간격 맞추기용
+        if st.button("삭제", key=f"del_{i}"):
+            remove_career(i)
+            st.rerun()
+
+st.button("➕ 경력 추가", on_click=add_career)
 
 # --- 계산 로직 ---
-if start_date and end_date:
-    if start_date > end_date:
-        st.error("⚠️ 시작일이 종료일보다 늦을 수 없습니다.")
-    else:
-        # 1. 전체 일수 계산 (당일 포함이므로 +1)
-        total_days = (end_date - start_date).days + 1
+st.markdown("---")
+st.subheader("2. 최종 합산 결과")
 
-        # 2. 역에 의한 연/월/일 계산
-        # 공무원 경력 계산은 종료일 '다음날'까지를 기준으로 상대적 차이를 구함
-        diff = relativedelta(end_date + relativedelta(days=1), start_date)
-        
-        years = diff.years
-        months = diff.months
-        days = diff.days
+total_years = 0
+total_months = 0
+total_days = 0
+grand_total_days = 0
 
-        # --- 결과 출력 ---
-        st.markdown("### 📊 계산 결과")
+for career in st.session_state.career_list:
+    s = career['start']
+    e = career['end']
+    
+    if s <= e:
+        # 각 항목별 일수 (당일 포함 +1)
+        item_total_days = (e - s).days + 1
+        grand_total_days += item_total_days
         
-        # 메인 결과 카드
-        st.success(f"### **{years}년 {months}월 {days}일**")
-        
-        # 상세 정보
-        col_res1, col_res2 = st.columns(2)
-        with col_res1:
-            st.metric(label="총 일수", value=f"{total_days}일")
-        with col_res2:
-            st.info(f"💡 기간: {start_date} ~ {end_date}")
+        # 역에 의한 차이 계산 (종료일 다음날 기준)
+        diff = relativedelta(e + relativedelta(days=1), s)
+        total_years += diff.years
+        total_months += diff.months
+        total_days += diff.days
+
+# 월과 일 올림 처리 (30일 -> 1월, 12월 -> 1년)
+# ※ 참고: 공무원 획일적 계산 방식에 따라 단순 합산 후 조정
+total_months += total_days // 30
+total_days = total_days % 30
+total_years += total_months // 12
+total_months = total_months % 12
+
+# --- 결과 출력 ---
+res_col1, res_col2 = st.columns(2)
+
+with res_col1:
+    st.success(f"### 합산 경력: **{total_years}년 {total_months}월 {total_days}일**")
+    st.info(f"💡 모든 기간을 역에 의해 합산한 결과입니다.")
+
+with res_col2:
+    st.metric(label="총 일수 합계", value=f"{grand_total_days}일")
 
 st.markdown("---")
-st.caption("※ 본 계산은 민법 제160조(역에 의한 계산) 원칙을 따르며, 종료일 다음날을 기준으로 기간을 산출합니다.")
+st.caption("※ 본 계산기는 입력된 각 기간의 연/월/일을 먼저 구한 뒤 합산하며, 남은 일수가 30일 이상일 경우 1개월로 환산합니다.")
