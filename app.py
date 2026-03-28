@@ -1,45 +1,50 @@
+%%writefile app.py
 import streamlit as st
 from datetime import date
+from dateutil.relativedelta import relativedelta
 
-# --- 앱 제목 및 설명 ---
-st.title("📅 역에 의한 날짜 계산기")
+# --- 앱 설정 ---
+st.set_page_config(page_title="공무원 경력 계산기", page_icon="📜")
+
+st.title("📜 역(曆)에 의한 경력 계산기")
 st.markdown("---")
-st.write("두 날짜 사이의 간격이 며칠인지 계산해 줍니다. (기준일 포함)")
+st.write("공무원 인사처 기준에 맞춘 역에 의한 경력 산출 도구입니다.")
 
 # --- 입력 부 ---
-st.subheader("1. 날짜를 선택해 주세요")
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("임용일 (시작일)", date.today())
+with col2:
+    end_date = st.date_input("퇴직일 (종료일)", date.today())
 
-# 오늘 날짜를 기본값으로 설정
-today = date.today()
-
-# 두 개의 날짜 입력창
-start_date = st.date_input("기준 날짜", today)
-end_date = st.date_input("종료 날짜", today)
-
-# --- 로직 부 ---
+# --- 계산 로직 ---
 if start_date and end_date:
-    # 두 날짜의 차이 계산
-    delta = end_date - start_date
-    diff_days = delta.days
-
-    # 결과 출력 (보통 D-Day는 기준일을 1일로 포함하므로 +1)
-    d_day_result = diff_days + 1
-
-    # --- 출력 부 ---
-    st.markdown("---")
-    st.subheader("2. 계산 결과")
-
-    if d_day_result > 0:
-        st.success(f"**기준일로부터 {d_day_result}일째** 되는 날입니다.")
-    elif d_day_result == 1:
-        st.info("**오늘입니다.**")
+    if start_date > end_date:
+        st.error("⚠️ 시작일이 종료일보다 늦을 수 없습니다.")
     else:
-        # 종료일이 과거일 경우
-        st.warning(f"**기준일보다 {abs(d_day_result)+1}일 전입니다.**")
+        # 1. 전체 일수 계산 (당일 포함이므로 +1)
+        total_days = (end_date - start_date).days + 1
 
-    # 가독성을 위한 부가 정보
-    st.info(f"(순수 날짜 차이: {diff_days}일)")
+        # 2. 역에 의한 연/월/일 계산
+        # 공무원 경력 계산은 종료일 '다음날'까지를 기준으로 상대적 차이를 구함
+        diff = relativedelta(end_date + relativedelta(days=1), start_date)
+        
+        years = diff.years
+        months = diff.months
+        days = diff.days
 
-# --- 푸터 ---
+        # --- 결과 출력 ---
+        st.markdown("### 📊 계산 결과")
+        
+        # 메인 결과 카드
+        st.success(f"### **{years}년 {months}월 {days}일**")
+        
+        # 상세 정보
+        col_res1, col_res2 = st.columns(2)
+        with col_res1:
+            st.metric(label="총 일수", value=f"{total_days}일")
+        with col_res2:
+            st.info(f"💡 기간: {start_date} ~ {end_date}")
+
 st.markdown("---")
-st.caption("간단한 스트림릿 실습 앱입니다.")
+st.caption("※ 본 계산은 민법 제160조(역에 의한 계산) 원칙을 따르며, 종료일 다음날을 기준으로 기간을 산출합니다.")
