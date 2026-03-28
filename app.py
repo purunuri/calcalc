@@ -1,4 +1,3 @@
-%%writefile app.py
 import streamlit as st
 from datetime import date
 from dateutil.relativedelta import relativedelta
